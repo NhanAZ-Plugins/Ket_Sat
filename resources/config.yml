@@ -1,0 +1,26 @@
+---
+# Nhà Cung Cấp
+# Các Loại: "mysql", "json", "yaml"
+provider: json
+
+# Điều Này Chỉ Cần Thiết Nếu Nhà Cung Cấp Là "mysql"
+mysql:
+  # Địa Chỉ IP Thuộc Cơ Sở Dữ Liệu mysql
+  ip: 127.0.0.1
+  # Người Dùng mysql "Root" Để Phòng Ngừa An Toàn
+  user: root
+  # Mật Khẩu Trong Văn Bản Đơn Giản. Hãy Chắc Rằng Bạn Giữ Bí Mật Về Tập Tin Này
+  pass: 19283746
+  # Tên Cơ Sở Dữ Liệu Để Lưu Cơ Sở Dữ Liệu
+  database: vault
+  # Cổng Cơ Sở Dữ Liệu, Mặc Định: 3306
+  port: 3306
+
+# Số Lượng Két Sắt Tối Đa Mà Người Chơi Có Thể Có
+max-vaults: 25
+
+# Tên Két Sắt
+# {VAULTNO} -> Số Két 
+vaultinv-name: "§f•§a Két Sắt Số:§b {VAULTNO} §f•"
+#Edit: Ghast Noob
+...
