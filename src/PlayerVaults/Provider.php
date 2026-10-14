@@ -1,143 +1,228 @@
 <?php
 
+declare(strict_types=1);
+
 namespace PlayerVaults;
 
-use PlayerVaults\Task\{DeleteVaultTask, FetchInventoryTask, SaveInventoryTask};
-use PlayerVaults\Vault\{Vault, VaultInventory};
+use PlayerVaults\Vault\VaultInventory;
+use pocketmine\block\VanillaBlocks;
+use pocketmine\block\tile\Spawnable;
+use pocketmine\network\mcpe\protocol\BlockActorDataPacket;
+use pocketmine\network\mcpe\protocol\UpdateBlockPacket;
+use pocketmine\network\mcpe\protocol\types\BlockPosition;
+use pocketmine\network\mcpe\protocol\types\CacheableNbt;
+use pocketmine\player\Player;
+use pocketmine\utils\Config;
+use pocketmine\world\Position;
+use pocketmine\world\World;
 
-use pocketmine\block\Block;
-use pocketmine\nbt\NBT;
-use pocketmine\nbt\tag\{ByteTag, CompoundTag, IntTag, ListTag, StringTag};
-use pocketmine\Player;
-use pocketmine\tile\Tile;
+final class Provider{
+	public const JSON = "json";
+	public const YAML = "yaml";
 
-class Provider{
+	private int $configType;
+	private string $storageDirectory;
+	/** @var array<string, VaultInventory> */
+	private array $openVaults = [];
 
-    const INVENTORY_HEIGHT = 2;
+	public function __construct(private PlayerVaults $plugin, private string $type){
+		$this->configType = match($type){
+			self::JSON => Config::JSON,
+			self::YAML => Config::YAML,
+			default => throw new \InvalidArgumentException("Unsupported vault provider: {$type}")
+		};
+		$this->storageDirectory = $plugin->getDataFolder() . "vaults" . DIRECTORY_SEPARATOR;
+		if(!is_dir($this->storageDirectory) && !mkdir($this->storageDirectory, 0775, true) && !is_dir($this->storageDirectory)){
+			throw new \RuntimeException("Could not create the vault storage directory");
+		}
+	}
 
-    const TYPE_FROM_STRING = [
-        'json' => Provider::JSON,
-        'yaml' => Provider::YAML,
-        'yml' => Provider::YAML,
-        'mysql' => Provider::MYSQL
-    ];
+	public function getPlugin() : PlayerVaults{
+		return $this->plugin;
+	}
 
-    const JSON = 0;
-    const YAML = 1;
-    const MYSQL = 2;
-    const UNKNOWN = 3;
+	public function openVault(Player $viewer, string $owner, int $number) : bool{
+		$key = $this->key($owner, $number);
+		if(isset($this->openVaults[$key])){
+			if(count($this->openVaults[$key]->getViewers()) > 0){
+				return false;
+			}
+			unset($this->openVaults[$key]);
+		}
 
-    private $data = [];
-    private $server = null;
-    private $type = Provider::JSON;
-    private $inventoryName = "";
+		$vaultData = $this->loadPlayerVaultData($owner);
+		$encoded = $vaultData[$number] ?? "";
+		$contents = $encoded === "" ? [] : VaultDataCodec::decode($encoded);
 
-    public function __construct(int $type){
-        if($type === Provider::UNKNOWN){
-            throw new \Exception("Lớp Hằng '$type' Không Tồn Tại. Chuyển Sang JSON.");
-            $type = Provider::JSON;
-        }
-        $this->type = $type;
+		$world = $viewer->getWorld();
+		$position = $viewer->getPosition();
+		$x = $position->getFloorX();
+		$y = $position->getFloorY() + 2;
+		$z = $position->getFloorZ();
+		if($y < World::Y_MIN || $y >= $world->getMaxY()){
+			return false;
+		}
 
-        $core = PlayerVaults::getInstance();
-        $this->server = $core->getServer();
-        $this->setInventoryName($core->getFromConfig("vaultinv-name") ?? "");
+		$holder = new Position($x, $y, $z, $world);
+		$titleSetting = $this->plugin->getConfig()->get("vaultinv-name", "Vault {VAULTNO}");
+		$titleTemplate = is_string($titleSetting) ? $titleSetting : "Vault {VAULTNO}";
+		$title = str_replace("{VAULTNO}", (string) $number, $titleTemplate);
+		$inventory = new VaultInventory($holder, $this, $owner, $number);
+		$inventory->setContents($contents);
+		$this->showFakeChest($viewer, $holder, $title);
+		$this->openVaults[$key] = $inventory;
+		if(!$viewer->setCurrentWindow($inventory)){
+			$this->restoreBlock($viewer, $holder);
+			unset($this->openVaults[$key]);
+			return false;
+		}
+		return true;
+	}
 
-        if(is_file($oldfile = $core->getDataFolder()."vaults.json")){
-            $data = json_decode(file_get_contents($oldfile));
-            $logger = $core->getLogger();
-            foreach($data as $k => $v){
-                file_put_contents($core->getDataFolder()."vaults/".$k.".json", json_encode($v, JSON_PRETTY_PRINT));
-                $logger->notice("Đã Chuyển $k's Dữ Liệu Két Sắt Đến /ketsat");
-            }
-            rename($oldfile, $oldfile.".bak");
-        }elseif(is_file($oldfile = $core->getDataFolder()."vaults.yml")){
-            $data = yaml_parse_file($oldfile);
-            $logger = $core->getLogger();
-            foreach($data as $k => $v){
-                yaml_emit_file($core->getDataFolder()."vaults/".$k.".yml", $v);
-                $logger->notice("Đã Chuyển $k's Dữ Liệu Két Sắt Đến /ketsat");
-            }
-            rename($oldfile, $oldfile.".bak");
-        }
+	/** @param array<int, \pocketmine\item\Item> $contents */
+	public function saveClosedVault(VaultInventory $inventory, string $owner, int $number, array $contents) : void{
+		$key = $this->key($owner, $number);
+		try{
+			$vaultData = $this->loadPlayerVaultData($owner);
+			$vaultData[$number] = VaultDataCodec::encode($contents);
+			$this->savePlayerVaultData($owner, $vaultData);
+		}finally{
+			if(($this->openVaults[$key] ?? null) === $inventory){
+				unset($this->openVaults[$key]);
+			}
+		}
+	}
 
-        switch($type){
-            case Provider::JSON:
-            case Provider::YAML:
-                $this->data = $core->getDataFolder().'vaults/';
-                break;
-            case Provider::MYSQL:
-                $this->data = $core->getMysqlData();
-                break;
-        }
+	public function restoreBlock(Player $player, Position $position) : void{
+		if(!$position->isValid()){
+			return;
+		}
+		$world = $position->getWorld();
+		$x = $position->getFloorX();
+		$y = $position->getFloorY();
+		$z = $position->getFloorZ();
+		$blockPosition = BlockPosition::fromVector3($position);
+		$block = $world->getBlockAt($x, $y, $z);
+		$translator = $player->getNetworkSession()->getTypeConverter()->getBlockTranslator();
+		$networkId = $translator->internalIdToNetworkId($block->getStateId());
+		$player->getNetworkSession()->sendDataPacket(UpdateBlockPacket::create(
+			$blockPosition,
+			$networkId,
+			UpdateBlockPacket::FLAG_NETWORK,
+			UpdateBlockPacket::DATA_LAYER_NORMAL
+		));
 
-    }
+		$tile = $world->getTileAt($x, $y, $z);
+		if($tile instanceof Spawnable){
+			$player->getNetworkSession()->sendDataPacket(BlockActorDataPacket::create($blockPosition, $tile->getSerializedSpawnCompound()));
+		}
+	}
 
-    private function getServer(){
-        return $this->server;
-    }
+	private function showFakeChest(Player $player, Position $position, string $title) : void{
+		$blockPosition = BlockPosition::fromVector3($position);
+		$chestNetworkId = $player->getNetworkSession()->getTypeConverter()->getBlockTranslator()->internalIdToNetworkId(VanillaBlocks::CHEST()->getStateId());
+		$player->getNetworkSession()->sendDataPacket(UpdateBlockPacket::create(
+			$blockPosition,
+			$chestNetworkId,
+			UpdateBlockPacket::FLAG_NETWORK,
+			UpdateBlockPacket::DATA_LAYER_NORMAL
+		));
+		$chestTag = \pocketmine\nbt\tag\CompoundTag::create()
+			->setString("id", "Chest")
+			->setInt("x", $position->getFloorX())
+			->setInt("y", $position->getFloorY())
+			->setInt("z", $position->getFloorZ())
+			->setString("CustomName", $title);
+		$player->getNetworkSession()->sendDataPacket(BlockActorDataPacket::create($blockPosition, new CacheableNbt($chestTag)));
+	}
 
-    private function getInventoryName(int $vaultno) : string{
-        return str_replace("{VAULTNO}", $vaultno, $this->inventoryName);
-    }
+	public function deleteVaults(string $owner, ?int $number) : void{
+		if($number === null){
+			foreach($this->openVaults as $key => $_inventory){
+				if(str_starts_with($key, strtolower($owner) . ":")){
+					throw new \RuntimeException("Close the player's open vault before deleting all vault data");
+				}
+			}
+			$this->savePlayerVaultData($owner, []);
+			return;
+		}
 
-    public function setInventoryName(string $name){
-        $this->inventoryName = $name;
-    }
+		$key = $this->key($owner, $number);
+		if(isset($this->openVaults[$key])){
+			throw new \RuntimeException("Close the vault before deleting its data");
+		}
+		$vaultData = $this->loadPlayerVaultData($owner);
+		unset($vaultData[$number]);
+		$this->savePlayerVaultData($owner, $vaultData);
+	}
 
-    public function sendContents($player, int $number = 1, string $viewer = null){
-        $player = $player instanceof Player ? $player->getName() : strtolower($player);
-        if($viewer === null){
-            $viewer = $player;
-        }
-        $this->getServer()->getScheduler()->scheduleAsyncTask(new FetchInventoryTask($player, $this->type, $number, $viewer, $this->data));
-    }
+	/** @return array<int|string, string> */
+	private function loadPlayerVaultData(string $owner) : array{
+		$owner = $this->validateOwner($owner);
+		$playerFiles = [
+			$this->storageDirectory . $owner . "." . $this->type => $this->configType,
+			$this->storageDirectory . $owner . ($this->type === self::JSON ? ".yml" : ".json") => $this->type === self::JSON ? Config::YAML : Config::JSON
+		];
+		foreach($playerFiles as $playerPath => $format){
+			if(is_file($playerPath)){
+				return $this->normaliseVaultData((new Config($playerPath, $format))->getAll());
+			}
+		}
 
-    public function get(Player $player, array $contents, int $number = 1, string $vaultof = null) : VaultInventory{
-        if($vaultof === null){
-            $vaultof = $player->getLowerCaseName();
-        }
-        $tile = Tile::createTile("Vault", $level = $player->getLevel(), new CompoundTag("", [
-            new StringTag("id", Tile::CHEST),
-            new StringTag("CustomName", $this->getInventoryName($number)),
-            new IntTag("x", (int) $player->x),
-            new IntTag("y", (int) $player->y + Provider::INVENTORY_HEIGHT),
-            new IntTag("z", (int) $player->z),
-            new ByteTag("Vault", 1),
-            new IntTag("VaultNumber", $number),
-            new StringTag("VaultOf", $vaultof)
-        ]));
+		foreach([["json", Config::JSON], ["yml", Config::YAML]] as [$extension, $format]){
+			$legacyPath = $this->plugin->getDataFolder() . "vaults." . $extension;
+			if(!is_file($legacyPath)){
+				continue;
+			}
+			/** @var array<array-key, mixed> $legacy */
+			$legacy = (new Config($legacyPath, $format))->getAll();
+			foreach($legacy as $legacyOwner => $vaultData){
+				if(is_string($legacyOwner) && strtolower($legacyOwner) === $owner){
+					if(!is_array($vaultData)){
+						throw new \UnexpectedValueException("Legacy vault data for {$owner} is not a mapping");
+					}
+					return $this->normaliseVaultData($vaultData);
+				}
+			}
+		}
+		return [];
+	}
 
-        $block = Block::get(Block::CHEST);
-        $block->x = (int) $tile->x;
-        $block->y = (int) $tile->y;
-        $block->z = (int) $tile->z;
-        $block->level = $level;
-        $block->level->sendBlocks([$player], [$block]);
-        $inventory = new VaultInventory($tile);
-        $inventory->setContents($contents);
-        $tile->spawnTo($player);
-        return $inventory;
-    }
+	/** @param array<array-key, mixed> $vaultData
+	 *  @return array<int|string, string>
+	 */
+	private function normaliseVaultData(array $vaultData) : array{
+		$result = [];
+		foreach($vaultData as $number => $contents){
+			if(!preg_match('/^[1-9][0-9]*$/', (string) $number) || !is_string($contents)){
+				throw new \UnexpectedValueException("Vault data has an invalid slot or payload; refusing to overwrite it");
+			}
+			$result[(string) $number] = $contents;
+		}
+		return $result;
+	}
 
-    public function saveContents(Vault $tile, array $contents){
-        $player = $tile->namedtag["VaultOf"];
+	/** @param array<int|string, string> $vaultData */
+	private function savePlayerVaultData(string $owner, array $vaultData) : void{
+		$owner = $this->validateOwner($owner);
+		$path = $this->storageDirectory . $owner . "." . $this->type;
+		$config = new Config($path, $this->configType, []);
+		$config->setAll([]);
+		foreach($vaultData as $number => $contents){
+			$config->set((string) $number, $contents);
+		}
+		$config->save();
+	}
 
-        foreach ($contents as &$item) {
-            $item = $item->nbtSerialize(-1, "Item");
-        }
+	private function validateOwner(string $owner) : string{
+		$owner = strtolower($owner);
+		if(preg_match('/^[a-z0-9_]{1,16}$/', $owner) !== 1){
+			throw new \InvalidArgumentException("Invalid Minecraft player name");
+		}
+		return $owner;
+	}
 
-        $nbt = new NBT(NBT::BIG_ENDIAN);
-        $tag = new CompoundTag("Items", [
-            "ItemList" => new ListTag("ItemList", $contents)
-        ]);
-        $nbt->setData($tag);
-        $contents = base64_encode($nbt->writeCompressed(ZLIB_ENCODING_DEFLATE));
-
-        $this->getServer()->getScheduler()->scheduleAsyncTask(new SaveInventoryTask($player, $this->type, $this->data, $tile->namedtag["VaultNumber"], $contents));
-    }
-
-    public function deleteVault(string $player, int $vault){
-        $this->getServer()->getScheduler()->scheduleAsyncTask(new DeleteVaultTask($player, $this->type, $vault, $this->data));
-    }
+	private function key(string $owner, int $number) : string{
+		return $this->validateOwner($owner) . ":" . $number;
+	}
 }
