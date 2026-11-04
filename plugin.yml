@@ -2,11 +2,7 @@ name: KetSat
 main: PlayerVaults\PlayerVaults
 api: 5.0.0
 version: 3.0.0
-authors:
-  - Muqsit (PlayerVaults upstream)
-  - Ghast Moob (manifest edit attribution)
-  - Ghast Noob (config edit attribution)
-  - NhanAZ (Axolotl-PM API 5 port)
+authors: ["NhanAZ", "Muqsit (PlayerVaults upstream)", "Ghast Moob (manifest edit attribution)"]
 description: Personal item vaults with legacy JSON and YAML data support
 website: https://github.com/NhanAZ-Plugins/Ket_Sat
 commands:
