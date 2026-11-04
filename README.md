@@ -29,3 +29,8 @@ The historical MySQL implementation contained incomplete query strings and did n
 ## Attribution and license
 
 This source is derived from [Muqsit's PlayerVaults](https://github.com/Muqsit/PlayerVaults/tree/b7fc7fec73522837868e13c86a9b09343d9dc6a9), whose v2.0 source is distributed under GNU Lesser General Public License v3.0 or later. The original and edit attributions recorded in the historical manifest/config are preserved in the plugin metadata. This API 5 port and its changes are covered by the included [LGPL-3.0-or-later license](LICENSE).
+
+
+## Credits
+
+Authors: NhanAZ, Muqsit (PlayerVaults upstream), Ghast Moob (manifest edit attribution).
