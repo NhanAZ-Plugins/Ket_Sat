@@ -1,6 +1,15 @@
-# Két_Sắt
+# Ket_Sat
 
-Két_Sắt is a personal item-vault plugin ported to Axolotl-PM API 5.0.0. It opens a 27-slot chest interface for a numbered vault and stores each player's vaults in JSON or YAML files.
+Player vault plugin for Axolotl-PM API 5 with JSON and YAML data migration.
+
+[![CI](https://github.com/NhanAZ-Plugins/Ket_Sat/actions/workflows/build.yml/badge.svg)](https://github.com/NhanAZ-Plugins/Ket_Sat/actions/workflows/build.yml)
+[![Latest release](https://img.shields.io/github/v/release/NhanAZ-Plugins/Ket_Sat)](https://github.com/NhanAZ-Plugins/Ket_Sat/releases/latest)
+[![License](https://img.shields.io/github/license/NhanAZ-Plugins/Ket_Sat)](https://github.com/NhanAZ-Plugins/Ket_Sat/blob/main/LICENSE)
+[![Discord](https://img.shields.io/discord/986553214889517088?label=Discord&logo=discord&logoColor=white&color=5865F2)](https://discord.gg/j2X83ujT6c)
+
+## Overview
+
+This plugin targets the PocketMine-MP and Axolotl-PM API 5 ecosystem and is maintained under [NhanAZ-Plugins](https://github.com/NhanAZ-Plugins).
 
 ## Compatibility
 
