@@ -40,7 +40,7 @@ final class PlayerVaults extends PluginBase{
 
 		$this->maxVaults = $maxVaults;
 		$this->provider = new Provider($this, $providerType);
-		$this->getLogger()->notice("Két_Sắt API 5 is enabled with the {$providerType} provider. Legacy aggregate files are read without being modified.");
+		$this->getLogger()->notice("PlayerVaults is enabled with the {$providerType} provider. Legacy aggregate files are read without being modified.");
 	}
 
 	public function getMaxVaults() : int{
@@ -52,7 +52,7 @@ final class PlayerVaults extends PluginBase{
 	}
 
 	public function onCommand(CommandSender $sender, Command $command, string $label, array $args) : bool{
-		if(strtolower($command->getName()) !== "ketsat"){
+		if(!in_array(strtolower($command->getName()), ["playervaults", "ketsat"], true)){
 			return false;
 		}
 
@@ -68,17 +68,17 @@ final class PlayerVaults extends PluginBase{
 		}
 
 		if($subcommand === "of"){
-			if(!$sender->hasPermission("ketsat.admin")){
-				$sender->sendMessage(TextFormat::RED . "Bạn không có quyền dùng lệnh quản trị két sắt.");
+			if(!$this->hasAdminPermission($sender)){
+				$sender->sendMessage(TextFormat::RED . "You do not have permission to manage vaults.");
 				return true;
 			}
 			if(!isset($args[1]) || !$this->isValidPlayerName($args[1])){
-				$sender->sendMessage(TextFormat::YELLOW . "Dùng: /{$command->getName()} of <người chơi> [1-{$this->maxVaults}]");
+				$sender->sendMessage(TextFormat::YELLOW . "Usage: /{$command->getName()} of <player> [1-{$this->maxVaults}]");
 				return true;
 			}
 			$number = $this->parseVaultNumber($args[2] ?? "1");
 			if($number === null){
-				$sender->sendMessage(TextFormat::YELLOW . "Số két phải nằm trong khoảng 1-{$this->maxVaults}.");
+				$sender->sendMessage(TextFormat::YELLOW . "The vault number must be between 1 and {$this->maxVaults}.");
 				return true;
 			}
 			$this->openVault($sender, strtolower($args[1]), $number);
@@ -86,40 +86,40 @@ final class PlayerVaults extends PluginBase{
 		}
 
 		if($subcommand === "empty"){
-			if(!$sender->hasPermission("ketsat.admin")){
-				$sender->sendMessage(TextFormat::RED . "Bạn không có quyền dùng lệnh quản trị két sắt.");
+			if(!$this->hasAdminPermission($sender)){
+				$sender->sendMessage(TextFormat::RED . "You do not have permission to manage vaults.");
 				return true;
 			}
 			if(!isset($args[1]) || !$this->isValidPlayerName($args[1]) || !isset($args[2])){
-				$sender->sendMessage(TextFormat::YELLOW . "Dùng: /{$command->getName()} empty <người chơi> <1-{$this->maxVaults}|all>");
+				$sender->sendMessage(TextFormat::YELLOW . "Usage: /{$command->getName()} empty <player> <1-{$this->maxVaults}|all>");
 				return true;
 			}
 			$number = strtolower($args[2]) === "all" ? null : $this->parseVaultNumber($args[2]);
 			if(strtolower($args[2]) !== "all" && $number === null){
-				$sender->sendMessage(TextFormat::YELLOW . "Số két phải nằm trong khoảng 1-{$this->maxVaults}, hoặc dùng all.");
+				$sender->sendMessage(TextFormat::YELLOW . "The vault number must be between 1 and {$this->maxVaults}, or use all.");
 				return true;
 			}
 			try{
 				$this->provider->deleteVaults(strtolower($args[1]), $number);
-				$sender->sendMessage(TextFormat::GREEN . "Đã xóa " . ($number === null ? "tất cả két" : "két số {$number}") . " của {$args[1]}. Dữ liệu nguồn legacy vẫn được giữ nguyên.");
+				$sender->sendMessage(TextFormat::GREEN . "Deleted " . ($number === null ? "all vaults" : "vault {$number}") . " for {$args[1]}. Legacy data was preserved.");
 			}catch(\Throwable $exception){
 				$this->getLogger()->error("Could not delete vault data: " . $exception->getMessage());
-				$sender->sendMessage(TextFormat::RED . "Không thể cập nhật dữ liệu két sắt. Dữ liệu hiện có được giữ nguyên.");
+				$sender->sendMessage(TextFormat::RED . "Could not update vault data. Existing data was preserved.");
 			}
 			return true;
 		}
 
 		$number = $this->parseVaultNumber($args[0]);
 		if($number === null){
-			$sender->sendMessage(TextFormat::YELLOW . "Dùng: /{$command->getName()} <1-{$this->maxVaults}>");
+			$sender->sendMessage(TextFormat::YELLOW . "Usage: /{$command->getName()} <1-{$this->maxVaults}>");
 			return true;
 		}
 		if(!$sender instanceof Player){
-			$sender->sendMessage(TextFormat::RED . "Chỉ người chơi mới có thể mở két sắt.");
+			$sender->sendMessage(TextFormat::RED . "Only players can open vaults.");
 			return true;
 		}
-		if(!$sender->hasPermission("ketsat.command")){
-			$sender->sendMessage(TextFormat::RED . "Bạn không có quyền mở két sắt.");
+		if(!$this->hasCommandPermission($sender)){
+			$sender->sendMessage(TextFormat::RED . "You do not have permission to open vaults.");
 			return true;
 		}
 		$this->openVault($sender, strtolower($sender->getName()), $number);
@@ -128,16 +128,16 @@ final class PlayerVaults extends PluginBase{
 
 	private function openVault(CommandSender $viewer, string $owner, int $number) : void{
 		if(!$viewer instanceof Player){
-			$viewer->sendMessage(TextFormat::RED . "Chỉ người chơi mới có thể mở giao diện két sắt.");
+			$viewer->sendMessage(TextFormat::RED . "Only players can open vault interfaces.");
 			return;
 		}
 		try{
 			if(!$this->provider->openVault($viewer, $owner, $number)){
-				$viewer->sendMessage(TextFormat::RED . "Két này đang được mở trong một phiên khác hoặc không thể mở tại vị trí hiện tại.");
+				$viewer->sendMessage(TextFormat::RED . "That vault is already open or cannot be opened here.");
 			}
 		}catch(\Throwable $exception){
 			$this->getLogger()->error("Could not open {$owner}'s vault {$number}: " . $exception->getMessage());
-			$viewer->sendMessage(TextFormat::RED . "Không thể đọc dữ liệu két sắt. Dữ liệu cũ chưa bị thay đổi.");
+			$viewer->sendMessage(TextFormat::RED . "Could not read vault data. Existing data was not changed.");
 		}
 	}
 
@@ -154,18 +154,26 @@ final class PlayerVaults extends PluginBase{
 	}
 
 	private function sendUsage(CommandSender $sender, Command $command) : void{
-		$sender->sendMessage(TextFormat::AQUA . "/{$command->getName()} <1-{$this->maxVaults}> " . TextFormat::GRAY . "- Mở két sắt của bạn");
-		if($sender->hasPermission("ketsat.admin")){
+		$sender->sendMessage(TextFormat::AQUA . "/{$command->getName()} <1-{$this->maxVaults}> " . TextFormat::GRAY . "- Open one of your vaults");
+		if($this->hasAdminPermission($sender)){
 			$this->sendAdminUsage($sender, $command);
 		}
 	}
 
 	private function sendAdminUsage(CommandSender $sender, Command $command) : void{
-		if(!$sender->hasPermission("ketsat.admin")){
-			$sender->sendMessage(TextFormat::RED . "Bạn không có quyền xem lệnh quản trị két sắt.");
+		if(!$this->hasAdminPermission($sender)){
+			$sender->sendMessage(TextFormat::RED . "You do not have permission to view admin vault commands.");
 			return;
 		}
-		$sender->sendMessage(TextFormat::AQUA . "/{$command->getName()} of <người chơi> [1-{$this->maxVaults}] " . TextFormat::GRAY . "- Xem két sắt");
-		$sender->sendMessage(TextFormat::AQUA . "/{$command->getName()} empty <người chơi> <1-{$this->maxVaults}|all> " . TextFormat::GRAY . "- Xóa dữ liệu két sắt");
+		$sender->sendMessage(TextFormat::AQUA . "/{$command->getName()} of <player> [1-{$this->maxVaults}] " . TextFormat::GRAY . "- Open a player's vault");
+		$sender->sendMessage(TextFormat::AQUA . "/{$command->getName()} empty <player> <1-{$this->maxVaults}|all> " . TextFormat::GRAY . "- Delete vault data");
+	}
+
+	private function hasCommandPermission(CommandSender $sender) : bool{
+		return $sender->hasPermission("playervaults.command") || $sender->hasPermission("ketsat.command");
+	}
+
+	private function hasAdminPermission(CommandSender $sender) : bool{
+		return $sender->hasPermission("playervaults.admin") || $sender->hasPermission("ketsat.admin");
 	}
 }

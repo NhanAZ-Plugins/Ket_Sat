@@ -1,17 +1,21 @@
-name: KetSat
+name: PlayerVaults
 main: PlayerVaults\PlayerVaults
 api: 5.0.0
 version: 3.0.0
-authors: ["NhanAZ", "Muqsit (PlayerVaults upstream)", "Ghast Moob (manifest edit attribution)"]
+authors: ["NhanAZ", "Muqsit (PlayerVaults upstream)"]
 description: Personal item vaults with legacy JSON and YAML data support
-website: https://github.com/NhanAZ-Plugins/Ket_Sat
+website: https://github.com/NhanAZ-Plugins/PlayerVaults
 commands:
-  ketsat:
+  playervaults:
     description: Open a personal item vault
-    usage: "/ketsat <number|help>"
-    aliases: [ks]
-    permission: ketsat.command
+    usage: "/playervaults <number|help>"
+    aliases: [pv, vaults, ketsat, ks]
+    permission: playervaults.command
 permissions:
+  playervaults.command:
+    default: true
+  playervaults.admin:
+    default: op
   ketsat.command:
     default: true
   ketsat.admin:

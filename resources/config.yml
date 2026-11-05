@@ -6,4 +6,4 @@ provider: json
 max-vaults: 25
 
 # {VAULTNO} is replaced with the opened vault number.
-vaultinv-name: "Két sắt số {VAULTNO}"
+vaultinv-name: "Vault {VAULTNO}"

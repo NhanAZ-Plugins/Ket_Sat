@@ -1,4 +1,4 @@
-name: Build and validate Két_Sắt plugin
+name: Build and validate PlayerVaults plugin
 
 on:
   push:
@@ -16,7 +16,7 @@ jobs:
     name: Lint plugin source
     runs-on: ubuntu-24.04
     steps:
-      - name: Check out Két_Sắt source
+      - name: Check out PlayerVaults source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Set up PHP 8.4
         uses: axolotl-pm/setup-php-action@b8c3f9add4f2ad4a5e2624a1112aba899ee8db0e
@@ -42,7 +42,7 @@ jobs:
       pm-version-major: '5'
       phpstan: max
       axolotl-ref: ${{ matrix.ref }}
-      artifact-name: ket-sat-api-${{ matrix.label }}-${{ github.sha }}
+      artifact-name: player-vaults-api-${{ matrix.label }}-${{ github.sha }}
   runtime-smoke:
     name: Smoke-test plugin startup on Axolotl-PM 5.51.1
     needs: [lint, build]
@@ -56,7 +56,7 @@ jobs:
       - name: Download the API 5.51.1 PHAR built by this run
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
-          name: ket-sat-api-5.51.1-${{ github.sha }}
+          name: player-vaults-api-5.51.1-${{ github.sha }}
           path: ${{ runner.temp }}/ket-sat-artifact
       - name: Download and verify the official Axolotl-PM server PHAR
         shell: bash
@@ -70,14 +70,14 @@ jobs:
             https://github.com/axolotl-pm/PocketMine-MP/releases/download/5.51.1/PocketMine-MP.phar \
             --output "$runtime/PocketMine-MP.phar"
           printf '%s  %s\n' "$SERVER_SHA256" "$runtime/PocketMine-MP.phar" | sha256sum --check --status
-          cp "${{ runner.temp }}/ket-sat-artifact/KetSat.phar" "$runtime/data/plugins/KetSat.phar"
+          cp "${{ runner.temp }}/ket-sat-artifact/PlayerVaults.phar" "$runtime/data/plugins/PlayerVaults.phar"
           php "$runtime/PocketMine-MP.phar" --no-wizard --disable-ansi \
             --data="$runtime/data" --plugins="$runtime/data/plugins" > "$runtime/server.log" 2>&1 &
           server_pid=$!
           enabled=0
           ready=0
           for _ in $(seq 1 90); do
-            if grep -Fq 'Enabling KetSat v3.0.0' "$runtime/server.log"; then enabled=1; fi
+            if grep -Fq 'Enabling PlayerVaults v3.0.0' "$runtime/server.log"; then enabled=1; fi
             if grep -Fq 'Done (' "$runtime/server.log"; then ready=1; break; fi
             if ! kill -0 "$server_pid" 2>/dev/null; then cat "$runtime/server.log"; exit 1; fi
             sleep 1

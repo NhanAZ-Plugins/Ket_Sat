@@ -1,10 +1,10 @@
-# Ket_Sat
+# PlayerVaults
 
 Player vault plugin for Axolotl-PM API 5 with JSON and YAML data migration.
 
-[![CI](https://github.com/NhanAZ-Plugins/Ket_Sat/actions/workflows/build.yml/badge.svg)](https://github.com/NhanAZ-Plugins/Ket_Sat/actions/workflows/build.yml)
-[![Latest release](https://img.shields.io/github/v/release/NhanAZ-Plugins/Ket_Sat)](https://github.com/NhanAZ-Plugins/Ket_Sat/releases/latest)
-[![License](https://img.shields.io/github/license/NhanAZ-Plugins/Ket_Sat)](https://github.com/NhanAZ-Plugins/Ket_Sat/blob/main/LICENSE)
+[![CI](https://github.com/NhanAZ-Plugins/PlayerVaults/actions/workflows/build.yml/badge.svg)](https://github.com/NhanAZ-Plugins/PlayerVaults/actions/workflows/build.yml)
+[![Latest release](https://img.shields.io/github/v/release/NhanAZ-Plugins/PlayerVaults)](https://github.com/NhanAZ-Plugins/PlayerVaults/releases/latest)
+[![License](https://img.shields.io/github/license/NhanAZ-Plugins/PlayerVaults)](https://github.com/NhanAZ-Plugins/PlayerVaults/blob/main/LICENSE)
 [![Discord](https://img.shields.io/discord/986553214889517088?label=Discord&logo=discord&logoColor=white&color=5865F2)](https://discord.gg/j2X83ujT6c)
 
 
@@ -16,9 +16,9 @@ The build workflow uses [DevTools](https://github.com/NhanAZ/DevTools) to build 
 
 ## Commands
 
-- `/ketsat <number>` opens one of your vaults.
-- `/ketsat of <player> [number]` opens a player's vault; requires `ketsat.admin`.
-- `/ketsat empty <player> <number|all>` deletes vault data; requires `ketsat.admin`.
+- `/playervaults <number>` opens one of your vaults. The legacy aliases `/pv`, `/vaults`, `/ketsat` and `/ks` remain available.
+- `/playervaults of <player> [number]` opens a player's vault; requires `playervaults.admin` or the legacy `ketsat.admin` permission.
+- `/playervaults empty <player> <number|all>` deletes vault data; requires `playervaults.admin` or the legacy `ketsat.admin` permission.
 
 ## Storage and migration
 
@@ -28,9 +28,9 @@ The historical MySQL implementation contained incomplete query strings and did n
 
 ## Attribution and license
 
-This source is derived from [Muqsit's PlayerVaults](https://github.com/Muqsit/PlayerVaults/tree/b7fc7fec73522837868e13c86a9b09343d9dc6a9), whose v2.0 source is distributed under GNU Lesser General Public License v3.0 or later. The original and edit attributions recorded in the historical manifest/config are preserved in the plugin metadata. This API 5 port and its changes are covered by the included [LGPL-3.0-or-later license](LICENSE).
+This source is derived from [Muqsit's PlayerVaults](https://github.com/Muqsit/PlayerVaults/tree/b7fc7fec73522837868e13c86a9b09343d9dc6a9), whose v2.0 source is distributed under GNU Lesser General Public License v3.0 or later. This API 5 port and its changes are covered by the included [LGPL-3.0-or-later license](LICENSE).
 
 
 ## Credits
 
-Authors: NhanAZ, Muqsit (PlayerVaults upstream), Ghast Moob (manifest edit attribution).
+Authors: NhanAZ, Muqsit (PlayerVaults upstream).

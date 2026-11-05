@@ -25,7 +25,7 @@ final class VaultInventory extends ChestInventory{
 			$this->provider->saveClosedVault($this, $this->owner, $this->number, $this->getContents());
 		}catch(\Throwable $exception){
 			$this->provider->getPlugin()->getLogger()->error("Could not save {$this->owner}'s vault {$this->number}: " . $exception->getMessage());
-			$who->sendMessage("§cKét sắt chưa lưu được. Dữ liệu nguồn cũ vẫn được giữ nguyên.");
+			$who->sendMessage("§cThe vault could not be saved. Existing data was preserved.");
 		}finally{
 			$this->provider->restoreBlock($who, $this->getHolder());
 		}
